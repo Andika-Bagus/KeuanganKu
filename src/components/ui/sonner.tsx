@@ -1,10 +1,24 @@
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, toast } from "sonner";
+import { useEffect, useState } from "react";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
+
+  useEffect(() => {
+    // Check for saved theme preference or default to 'system'
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme) {
+      setTheme(savedTheme);
+    } else if (prefersDark) {
+      setTheme('dark');
+    } else {
+      setTheme('light');
+    }
+  }, []);
 
   return (
     <Sonner
