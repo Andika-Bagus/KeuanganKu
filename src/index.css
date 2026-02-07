@@ -105,7 +105,7 @@
 
 @layer components {
   .balance-card {
-    @apply relative overflow-hidden rounded-2xl p-6 text-white;
+    @apply relative overflow-hidden rounded-2xl p-4 sm:p-6 text-white min-h-[120px] sm:min-h-[140px];
     box-shadow: var(--shadow-lg);
   }
 

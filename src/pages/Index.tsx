@@ -67,26 +67,26 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 pb-24">
-      <div className="container max-w-lg mx-auto px-4 py-6">
+      <div className="container max-w-lg mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {/* Header Card */}
-        <header className="mb-6 p-6 bg-card rounded-2xl border border-border/50 shadow-sm">
-          <div className="flex items-center justify-between mb-1">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Catatan Keuangan</h1>
+        <header className="mb-6 p-4 sm:p-6 bg-card rounded-2xl border border-border/50 shadow-sm">
+          <div className="flex items-start justify-between mb-1">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">Catatan Keuangan</h1>
               {userName && (
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                   Halo, <span className="font-semibold text-primary">{userName}</span> 👋
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 ml-2">
               <ThemeToggle />
               <BudgetSettingsDialog settings={budgetSettings} onUpdate={updateBudgetSettings} />
               <Link 
                 to="/statistics" 
                 className="p-2 rounded-xl bg-muted hover:bg-primary/10 hover:text-primary transition-colors"
               >
-                <BarChart3 className="w-5 h-5" />
+                <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5" />
               </Link>
               <ResetDataDialog onReset={resetData} />
               <Button
@@ -96,22 +96,22 @@ const Index = () => {
                 onClick={signOut}
                 title="Logout"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
               </Button>
             </div>
           </div>
-          <p className="text-muted-foreground">Kelola uangmu dengan bijak</p>
+          <p className="text-muted-foreground text-sm sm:text-base">Kelola uangmu dengan bijak</p>
           
           {/* Total Balance inside header */}
           <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Total Saldo</p>
-              <p className="text-2xl font-bold text-foreground">{formatCurrency(totalBalance)}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total Saldo</p>
+              <p className="text-xl sm:text-2xl font-bold text-foreground break-all">{formatCurrency(totalBalance)}</p>
               <p className="text-xs text-muted-foreground mt-1">Rekening + Cash</p>
             </div>
             <div className="pt-3 border-t border-border/50">
-              <p className="text-sm text-muted-foreground mb-1">Total Tabungan</p>
-              <p className="text-3xl font-bold text-yellow-600">{formatCurrency(savingsBalance)}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total Tabungan</p>
+              <p className="text-2xl sm:text-3xl font-bold text-yellow-600 break-all">{formatCurrency(savingsBalance)}</p>
               <p className="text-xs text-muted-foreground mt-1">Khusus untuk target</p>
             </div>
           </div>

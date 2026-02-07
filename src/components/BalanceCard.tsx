@@ -23,20 +23,22 @@ export function BalanceCard({ type, balance, name }: BalanceCardProps) {
       <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full bg-white/5 translate-y-1/2 -translate-x-1/2" />
       
       <div className="relative z-10">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-white/20 flex items-center justify-center">
             {type === 'bank' ? (
-              <Building2 className="w-5 h-5" />
+              <Building2 className="w-4 h-4 sm:w-5 sm:h-5" />
             ) : (
-              <Wallet className="w-5 h-5" />
+              <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
             )}
           </div>
-          <span className="text-white/90 font-medium">{name}</span>
+          <span className="text-white/90 font-medium text-sm sm:text-base">{name}</span>
         </div>
         
         <div className="space-y-1">
-          <p className="text-white/70 text-sm">Saldo</p>
-          <p className="text-2xl font-bold tracking-tight">{formatCurrency(balance)}</p>
+          <p className="text-white/70 text-xs sm:text-sm">Saldo</p>
+          <p className="text-lg sm:text-xl lg:text-2xl font-bold tracking-tight leading-tight break-all">
+            {formatCurrency(balance)}
+          </p>
         </div>
       </div>
     </div>
