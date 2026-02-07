@@ -31,11 +31,12 @@ interface AddTransactionDialogProps {
   ) => void;
   bankBalance: number;
   cashBalance: number;
+  savingsBalance: number;
   dailyBudgetLimit: number;
   todayExpenses: number;
 }
 
-export function AddTransactionDialog({ onAdd, bankBalance, cashBalance, dailyBudgetLimit, todayExpenses }: AddTransactionDialogProps) {
+export function AddTransactionDialog({ onAdd, bankBalance, cashBalance, savingsBalance, dailyBudgetLimit, todayExpenses }: AddTransactionDialogProps) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TransactionType>('expense');
   const [amount, setAmount] = useState('');
@@ -103,7 +104,9 @@ export function AddTransactionDialog({ onAdd, bankBalance, cashBalance, dailyBud
   const getMaxAmount = () => {
     if (type === 'income') return undefined;
     if (type === 'expense' || type === 'transfer' || type === 'save') {
-      return account === 'bank' ? bankBalance : cashBalance;
+      if (account === 'bank') return bankBalance;
+      if (account === 'cash') return cashBalance;
+      if (account === 'savings') return savingsBalance;
     }
     return undefined;
   };
@@ -283,20 +286,20 @@ export function AddTransactionDialog({ onAdd, bankBalance, cashBalance, dailyBud
           {type !== 'save' && (
           <div className="space-y-2">
             <Label>
-              {type === 'transfer' ? 'Transfer Dari' : type === 'income' ? 'Masuk Ke' : 'Akun'}
+              {type === 'transfer' ? 'Transfer Dari' : type === 'income' ? 'Masuk Ke' : 'Keluar Dari'}
             </Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => setAccount('bank')}
-                className={`p-4 rounded-xl border-2 transition-all text-left ${
+                className={`p-3 rounded-xl border-2 transition-all text-left ${
                   account === 'bank' 
                     ? 'border-primary bg-primary/5' 
                     : 'border-border hover:border-muted-foreground'
                 }`}
               >
-                <span className="font-medium">Rekening</span>
-                <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-sm">Rekening</span>
+                <p className="text-xs text-muted-foreground">
                   {new Intl.NumberFormat('id-ID', {
                     style: 'currency',
                     currency: 'IDR',
@@ -308,14 +311,14 @@ export function AddTransactionDialog({ onAdd, bankBalance, cashBalance, dailyBud
               <button
                 type="button"
                 onClick={() => setAccount('cash')}
-                className={`p-4 rounded-xl border-2 transition-all text-left ${
+                className={`p-3 rounded-xl border-2 transition-all text-left ${
                   account === 'cash' 
                     ? 'border-primary bg-primary/5' 
                     : 'border-border hover:border-muted-foreground'
                 }`}
               >
-                <span className="font-medium">Cash</span>
-                <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-sm">Cash</span>
+                <p className="text-xs text-muted-foreground">
                   {new Intl.NumberFormat('id-ID', {
                     style: 'currency',
                     currency: 'IDR',
@@ -323,6 +326,27 @@ export function AddTransactionDialog({ onAdd, bankBalance, cashBalance, dailyBud
                   }).format(cashBalance)}
                 </p>
               </button>
+
+              {type === 'expense' && (
+                <button
+                  type="button"
+                  onClick={() => setAccount('savings')}
+                  className={`p-3 rounded-xl border-2 transition-all text-left ${
+                    account === 'savings' 
+                      ? 'border-yellow-600 bg-yellow-600/5' 
+                      : 'border-border hover:border-muted-foreground'
+                  }`}
+                >
+                  <span className="font-medium text-sm">Tabungan</span>
+                  <p className="text-xs text-muted-foreground">
+                    {new Intl.NumberFormat('id-ID', {
+                      style: 'currency',
+                      currency: 'IDR',
+                      minimumFractionDigits: 0,
+                    }).format(savingsBalance)}
+                  </p>
+                </button>
+              )}
             </div>
             
             {type === 'transfer' && (

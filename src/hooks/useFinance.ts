@@ -87,6 +87,8 @@ export function useFinance() {
           newBankBalance -= amount;
         } else if (account === 'cash') {
           newCashBalance -= amount;
+        } else if (account === 'savings') {
+          newSavingsBalance -= amount;
         }
       } else if (type === 'transfer' && targetAccount) {
         // Transfer from account to targetAccount
@@ -138,6 +140,8 @@ export function useFinance() {
           newBankBalance += transaction.amount;
         } else if (transaction.account === 'cash') {
           newCashBalance += transaction.amount;
+        } else if (transaction.account === 'savings') {
+          newSavingsBalance += transaction.amount;
         }
       } else if (transaction.type === 'transfer' && transaction.targetAccount) {
         // Reverse transfer

@@ -136,6 +136,7 @@ const Index = () => {
           onAdd={addTransaction}
           bankBalance={bankBalance}
           cashBalance={cashBalance}
+          savingsBalance={savingsBalance}
           dailyBudgetLimit={budgetSettings.dailyCashLimit}
           todayExpenses={todayCashExpenses}
         />
