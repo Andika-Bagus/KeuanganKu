@@ -1,15 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, TrendingDown, TrendingUp, Calendar } from 'lucide-react';
-import { useFinance } from '@/hooks/useFinance';
+import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { startOfDay, startOfWeek, startOfMonth, isAfter, format, subDays } from 'date-fns';
 import { id } from 'date-fns/locale';
 
 const Statistics = () => {
-  const { transactions } = useFinance();
+  const { transactions, loading } = useSupabaseFinance();
+  const [period, setPeriod] = useState<'today' | 'week' | 'month'>('today');
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('id-ID', {
@@ -21,6 +21,14 @@ const Statistics = () => {
   };
 
   const stats = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return {
+        today: { expense: 0, income: 0 },
+        week: { expense: 0, income: 0 },
+        month: { expense: 0, income: 0 },
+      };
+    }
+
     const now = new Date();
     const todayStart = startOfDay(now);
     const weekStart = startOfWeek(now, { weekStartsOn: 1 });
@@ -68,6 +76,10 @@ const Statistics = () => {
 
   // Data untuk grafik 7 hari terakhir
   const last7DaysData = useMemo(() => {
+    if (!transactions || transactions.length === 0) {
+      return [];
+    }
+    
     const data = [];
     for (let i = 6; i >= 0; i--) {
       const date = subDays(new Date(), i);
@@ -88,6 +100,7 @@ const Statistics = () => {
 
       data.push({
         day: format(date, 'EEE', { locale: id }),
+        date: format(date, 'dd/MM', { locale: id }),
         pengeluaran: expense,
         pemasukan: income,
       });
@@ -95,30 +108,23 @@ const Statistics = () => {
     return data;
   }, [transactions]);
 
-  // Data untuk pie chart kategori akun
-  const accountData = useMemo(() => {
-    let bankExpense = 0;
-    let cashExpense = 0;
-
-    const monthStart = startOfMonth(new Date());
-
-    transactions.forEach((t) => {
-      const date = new Date(t.date);
-      if (t.type === 'expense' && (isAfter(date, monthStart) || date.getTime() === monthStart.getTime())) {
-        if (t.account === 'bank') bankExpense += t.amount;
-        else cashExpense += t.amount;
-      }
-    });
-
-    return [
-      { name: 'Rekening', value: bankExpense, fill: 'hsl(var(--primary))' },
-      { name: 'Cash', value: cashExpense, fill: 'hsl(var(--success))' },
-    ].filter(d => d.value > 0);
-  }, [transactions]);
-
-  // Data untuk pie chart kategori pengeluaran
+  // Data untuk kategori pengeluaran
   const categoryData = useMemo(() => {
-    const monthStart = startOfMonth(new Date());
+    if (!transactions || transactions.length === 0) {
+      return [];
+    }
+    
+    const now = new Date();
+    let startDate;
+    
+    if (period === 'today') {
+      startDate = startOfDay(now);
+    } else if (period === 'week') {
+      startDate = startOfWeek(now, { weekStartsOn: 1 });
+    } else {
+      startDate = startOfMonth(now);
+    }
+
     const categoryMap: Record<string, number> = {};
 
     const categoryLabels: Record<string, string> = {
@@ -136,7 +142,7 @@ const Statistics = () => {
 
     transactions.forEach((t) => {
       const date = new Date(t.date);
-      if (t.type === 'expense' && (isAfter(date, monthStart) || date.getTime() === monthStart.getTime())) {
+      if (t.type === 'expense' && (isAfter(date, startDate) || date.getTime() === startDate.getTime())) {
         const cat = t.category || 'lainnya';
         categoryMap[cat] = (categoryMap[cat] || 0) + t.amount;
       }
@@ -162,18 +168,21 @@ const Statistics = () => {
         fill: colors[index % colors.length],
       }))
       .sort((a, b) => b.value - a.value);
-  }, [transactions]);
+  }, [transactions, period]);
 
-  const chartConfig = {
-    pengeluaran: {
-      label: 'Pengeluaran',
-      color: 'hsl(var(--destructive))',
-    },
-    pemasukan: {
-      label: 'Pemasukan',
-      color: 'hsl(var(--success))',
-    },
-  };
+  const currentStats = period === 'today' ? stats.today : period === 'week' ? stats.week : stats.month;
+  const periodLabel = period === 'today' ? 'Hari Ini' : period === 'week' ? 'Minggu Ini' : 'Bulan Ini';
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Memuat statistik...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 pb-8">
@@ -192,261 +201,264 @@ const Statistics = () => {
           </div>
         </header>
 
-        {/* Info Box */}
-        <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-xl">
-          <p className="text-sm text-foreground">
-            💡 <span className="font-medium">Tips:</span> Pantau pengeluaranmu secara berkala untuk mengatur keuangan lebih baik
-          </p>
-        </div>
+        {/* Period Tabs */}
+        <Tabs value={period} onValueChange={(v) => setPeriod(v as any)} className="mb-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="today">Hari Ini</TabsTrigger>
+            <TabsTrigger value="week">Minggu Ini</TabsTrigger>
+            <TabsTrigger value="month">Bulan Ini</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        {/* Summary Cards */}
-        <div className="space-y-4 mb-6">
-          {/* Today */}
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Hari Ini
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm">
-                  <TrendingDown className="w-4 h-4 text-destructive" />
-                  Keluar
-                </span>
-                <span className="font-semibold text-destructive">{formatCurrency(stats.today.expense)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm">
-                  <TrendingUp className="w-4 h-4 text-success" />
-                  Masuk
-                </span>
-                <span className="font-semibold text-success">{formatCurrency(stats.today.income)}</span>
-              </div>
-              <div className="pt-2 border-t border-border/50">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Selisih</span>
-                  <span className={`text-sm font-bold ${stats.today.income - stats.today.expense >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(stats.today.income - stats.today.expense)}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* This Week */}
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Minggu Ini
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm">
-                  <TrendingDown className="w-4 h-4 text-destructive" />
-                  Keluar
-                </span>
-                <span className="font-semibold text-destructive">{formatCurrency(stats.week.expense)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm">
-                  <TrendingUp className="w-4 h-4 text-success" />
-                  Masuk
-                </span>
-                <span className="font-semibold text-success">{formatCurrency(stats.week.income)}</span>
-              </div>
-              <div className="pt-2 border-t border-border/50">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Selisih</span>
-                  <span className={`text-sm font-bold ${stats.week.income - stats.week.expense >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(stats.week.income - stats.week.expense)}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* This Month */}
-          <Card className="border-border/50">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                Bulan Ini
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm">
-                  <TrendingDown className="w-4 h-4 text-destructive" />
-                  Keluar
-                </span>
-                <span className="font-semibold text-destructive">{formatCurrency(stats.month.expense)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-sm">
-                  <TrendingUp className="w-4 h-4 text-success" />
-                  Masuk
-                </span>
-                <span className="font-semibold text-success">{formatCurrency(stats.month.income)}</span>
-              </div>
-              <div className="pt-2 border-t border-border/50">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Selisih</span>
-                  <span className={`text-sm font-bold ${stats.month.income - stats.month.expense >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(stats.month.income - stats.month.expense)}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Bar Chart - Last 7 Days */}
+        {/* Summary Card */}
         <Card className="border-border/50 mb-6">
-          <CardHeader>
-            <CardTitle className="text-base">Grafik 7 Hari Terakhir</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">
-              Perbandingan pengeluaran (merah) vs pemasukan (hijau) per hari
-            </p>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Ringkasan {periodLabel}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[200px] w-full">
-              <BarChart data={last7DaysData}>
-                <XAxis 
-                  dataKey="day" 
-                  tickLine={false} 
-                  axisLine={false}
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  tickLine={false} 
-                  axisLine={false}
-                  tick={{ fontSize: 10 }}
-                  tickFormatter={(value) => `${(value / 1000)}k`}
-                />
-                <ChartTooltip 
-                  content={<ChartTooltipContent />}
-                  formatter={(value: number) => formatCurrency(value)}
-                />
-                <Bar dataKey="pengeluaran" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="pemasukan" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ChartContainer>
-            <div className="flex justify-center gap-6 mt-4 text-sm">
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-destructive/10 rounded-lg">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-destructive" />
-                <span className="text-muted-foreground">Pengeluaran</span>
+                <TrendingDown className="w-5 h-5 text-destructive" />
+                <span className="font-medium">Pengeluaran</span>
               </div>
+              <span className="font-bold text-lg text-destructive">{formatCurrency(currentStats.expense)}</span>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 bg-success/10 rounded-lg">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-success" />
-                <span className="text-muted-foreground">Pemasukan</span>
+                <TrendingUp className="w-5 h-5 text-success" />
+                <span className="font-medium">Pemasukan</span>
               </div>
+              <span className="font-bold text-lg text-success">{formatCurrency(currentStats.income)}</span>
+            </div>
+            
+            <div className="pt-3 border-t border-border/50">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Selisih</span>
+                <span className={`text-xl font-bold ${currentStats.income - currentStats.expense >= 0 ? 'text-success' : 'text-destructive'}`}>
+                  {formatCurrency(currentStats.income - currentStats.expense)}
+                </span>
+              </div>
+              {currentStats.income - currentStats.expense < 0 && (
+                <p className="text-xs text-destructive mt-2">⚠️ Pengeluaran melebihi pemasukan</p>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Pie Chart - Account Distribution */}
-        {accountData.length > 0 && (
+        {/* 7 Days Chart */}
+        {last7DaysData.length > 0 && (
           <Card className="border-border/50 mb-6">
             <CardHeader>
-              <CardTitle className="text-base">Pengeluaran per Akun (Bulan Ini)</CardTitle>
+              <CardTitle className="text-base">Grafik 7 Hari Terakhir</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
-                Dari mana uangmu keluar? Bank atau Cash?
+                Tren pengeluaran dan pemasukan harian
               </p>
             </CardHeader>
             <CardContent>
-              <div className="h-[200px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={accountData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {accountData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="flex justify-center gap-6 mt-4">
-                {accountData.map((entry) => (
-                  <div key={entry.name} className="flex items-center gap-2">
-                    <div 
-                      className="w-3 h-3 rounded-full" 
-                      style={{ backgroundColor: entry.fill }}
-                    />
-                    <div className="text-sm">
-                      <p className="text-muted-foreground">{entry.name}</p>
-                      <p className="font-medium">{formatCurrency(entry.value)}</p>
+              <div className="space-y-4">
+                {last7DaysData.map((day, index) => {
+                  const maxAmount = Math.max(...last7DaysData.map(d => Math.max(d.pengeluaran, d.pemasukan)));
+                  const expenseWidth = maxAmount > 0 ? (day.pengeluaran / maxAmount) * 100 : 0;
+                  const incomeWidth = maxAmount > 0 ? (day.pemasukan / maxAmount) * 100 : 0;
+                  
+                  return (
+                    <div key={day.date} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-foreground">{day.day}</span>
+                        <span className="text-xs text-muted-foreground">{day.date}</span>
+                      </div>
+                      
+                      {/* Expense Bar */}
+                      {day.pengeluaran > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-20 text-xs text-muted-foreground">Keluar</div>
+                            <div className="flex-1 bg-muted/50 rounded-full h-8 overflow-hidden relative">
+                              <div 
+                                className="h-full bg-gradient-to-r from-red-500 to-red-600 flex items-center justify-end pr-3 text-xs text-white font-semibold transition-all duration-500 ease-out"
+                                style={{ width: `${Math.max(expenseWidth, 5)}%` }}
+                              >
+                                {expenseWidth > 20 && formatCurrency(day.pengeluaran)}
+                              </div>
+                            </div>
+                            {expenseWidth <= 20 && (
+                              <span className="text-xs text-muted-foreground w-28 text-right">{formatCurrency(day.pengeluaran)}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Income Bar */}
+                      {day.pemasukan > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <div className="w-20 text-xs text-muted-foreground">Masuk</div>
+                            <div className="flex-1 bg-muted/50 rounded-full h-8 overflow-hidden relative">
+                              <div 
+                                className="h-full bg-gradient-to-r from-green-500 to-green-600 flex items-center justify-end pr-3 text-xs text-white font-semibold transition-all duration-500 ease-out"
+                                style={{ width: `${Math.max(incomeWidth, 5)}%` }}
+                              >
+                                {incomeWidth > 20 && formatCurrency(day.pemasukan)}
+                              </div>
+                            </div>
+                            {incomeWidth <= 20 && (
+                              <span className="text-xs text-muted-foreground w-28 text-right">{formatCurrency(day.pemasukan)}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {day.pengeluaran === 0 && day.pemasukan === 0 && (
+                        <p className="text-xs text-muted-foreground text-center py-2">Tidak ada transaksi</p>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
+              </div>
+              
+              <div className="flex justify-center gap-6 mt-6 pt-4 border-t border-border/50">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-gradient-to-r from-red-500 to-red-600" />
+                  <span className="text-sm text-muted-foreground">Pengeluaran</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded bg-gradient-to-r from-green-500 to-green-600" />
+                  <span className="text-sm text-muted-foreground">Pemasukan</span>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Pie Chart - Category Distribution */}
-        {categoryData.length > 0 && (
+        {/* Category Distribution */}
+        {categoryData.length > 0 ? (
           <Card className="border-border/50">
             <CardHeader>
-              <CardTitle className="text-base">Pengeluaran per Kategori (Bulan Ini)</CardTitle>
+              <CardTitle className="text-base">Pengeluaran per Kategori</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">
-                Uangmu habis untuk apa saja? Lihat kategori terbesar
+                {periodLabel} - Kemana uangmu pergi?
               </p>
             </CardHeader>
             <CardContent>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={categoryData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {categoryData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
+              {/* Donut Chart */}
+              <div className="relative w-56 h-56 mx-auto mb-6">
+                <svg viewBox="0 0 100 100" className="transform -rotate-90">
+                  {(() => {
+                    const total = categoryData.reduce((sum, cat) => sum + cat.value, 0);
+                    let currentAngle = 0;
+                    
+                    return categoryData.map((entry) => {
+                      const percentage = (entry.value / total) * 100;
+                      const angle = (percentage / 100) * 360;
+                      const startAngle = currentAngle;
+                      currentAngle += angle;
+                      
+                      // Calculate path for pie slice
+                      const startRad = (startAngle * Math.PI) / 180;
+                      const endRad = (currentAngle * Math.PI) / 180;
+                      const x1 = 50 + 45 * Math.cos(startRad);
+                      const y1 = 50 + 45 * Math.sin(startRad);
+                      const x2 = 50 + 45 * Math.cos(endRad);
+                      const y2 = 50 + 45 * Math.sin(endRad);
+                      const largeArc = angle > 180 ? 1 : 0;
+                      
+                      return (
+                        <path
+                          key={entry.name}
+                          d={`M 50 50 L ${x1} ${y1} A 45 45 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                          fill={entry.fill}
+                          className="transition-all duration-300 hover:opacity-80 cursor-pointer"
+                          style={{
+                            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))'
+                          }}
+                        />
+                      );
+                    });
+                  })()}
+                  {/* Center circle for donut effect */}
+                  <circle cx="50" cy="50" r="28" fill="hsl(var(--card))" />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-xs text-muted-foreground mb-1">Total</p>
+                    <p className="text-lg font-bold">{formatCurrency(categoryData.reduce((sum, cat) => sum + cat.value, 0))}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{categoryData.length} kategori</p>
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                {categoryData.map((entry) => (
-                  <div key={entry.name} className="flex items-start gap-2 p-2 rounded-lg bg-muted/30">
-                    <div 
-                      className="w-3 h-3 rounded-full flex-shrink-0 mt-0.5" 
-                      style={{ backgroundColor: entry.fill }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground truncate">{entry.name}</p>
-                      <p className="text-sm font-semibold">{formatCurrency(entry.value)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {((entry.value / categoryData.reduce((sum, cat) => sum + cat.value, 0)) * 100).toFixed(1)}%
+              
+              {/* Category List with Progress Bars */}
+              <div className="space-y-3">
+                {categoryData.map((entry, index) => {
+                  const total = categoryData.reduce((sum, cat) => sum + cat.value, 0);
+                  const percentage = ((entry.value / total) * 100).toFixed(1);
+                  
+                  return (
+                    <div key={entry.name} className="group">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                            #{index + 1}
+                          </div>
+                          <div className="flex items-center gap-2 flex-1">
+                            <div 
+                              className="w-3 h-3 rounded-full flex-shrink-0 ring-2 ring-background shadow-sm" 
+                              style={{ backgroundColor: entry.fill }}
+                            />
+                            <span className="text-sm font-medium truncate">{entry.name}</span>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold">{formatCurrency(entry.value)}</p>
+                          <p className="text-xs text-muted-foreground">{percentage}%</p>
+                        </div>
+                      </div>
+                      {/* Animated Progress Bar */}
+                      <div className="ml-11">
+                        <div className="h-2 bg-muted/50 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all duration-700 ease-out shadow-sm"
+                            style={{ 
+                              width: `${percentage}%`,
+                              backgroundColor: entry.fill,
+                              boxShadow: `0 0 8px ${entry.fill}40`
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Insight Card */}
+              {categoryData.length > 0 && (
+                <div className="mt-6 p-4 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-xl border border-primary/20 shadow-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xl">💡</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-foreground mb-1">Kategori Terbesar</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        <span className="font-semibold text-foreground">{categoryData[0]?.name}</span> menghabiskan <span className="font-semibold text-foreground">{formatCurrency(categoryData[0]?.value)}</span> atau <span className="font-semibold text-primary">{((categoryData[0]?.value / categoryData.reduce((sum, cat) => sum + cat.value, 0)) * 100).toFixed(1)}%</span> dari total pengeluaran {periodLabel.toLowerCase()}
                       </p>
                     </div>
                   </div>
-                ))}
-              </div>
-              <div className="mt-4 p-3 bg-primary/5 rounded-lg border border-primary/10">
-                <p className="text-xs text-muted-foreground">
-                  💡 <span className="font-medium">Insight:</span> Kategori teratas: <span className="font-semibold text-foreground">{categoryData[0]?.name}</span> dengan total {formatCurrency(categoryData[0]?.value)}
-                </p>
-              </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-border/50">
+            <CardContent className="py-12 text-center">
+              <div className="text-6xl mb-4">📊</div>
+              <p className="text-muted-foreground font-medium">Belum ada pengeluaran {periodLabel.toLowerCase()}</p>
+              <p className="text-sm text-muted-foreground mt-2">Mulai catat transaksimu untuk melihat statistik</p>
             </CardContent>
           </Card>
         )}

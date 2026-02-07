@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, LogOut } from 'lucide-react';
 import { BalanceCard } from '@/components/BalanceCard';
 import { TransactionList } from '@/components/TransactionList';
 import { AddTransactionDialog } from '@/components/AddTransactionDialog';
@@ -8,9 +8,12 @@ import { SavingsGoalCard } from '@/components/SavingsGoalCard';
 import { AddSavingsGoalDialog } from '@/components/AddSavingsGoalDialog';
 import { BudgetSettingsDialog } from '@/components/BudgetSettingsDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { useFinance } from '@/hooks/useFinance';
+import { Button } from '@/components/ui/button';
+import { useSupabaseFinance } from '@/hooks/useSupabaseFinance';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Index = () => {
+  const { signOut, userName } = useAuth();
   const { 
     bankBalance, 
     cashBalance, 
@@ -18,13 +21,14 @@ const Index = () => {
     transactions, 
     savingsGoals,
     budgetSettings,
+    loading,
     addTransaction, 
     deleteTransaction, 
     resetData,
     addSavingsGoal,
     deleteSavingsGoal,
     updateBudgetSettings,
-  } = useFinance();
+  } = useSupabaseFinance();
 
   const totalBalance = bankBalance + cashBalance;
 
@@ -50,13 +54,31 @@ const Index = () => {
     }).format(amount);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Memuat data...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 pb-24">
       <div className="container max-w-lg mx-auto px-4 py-6">
         {/* Header Card */}
         <header className="mb-6 p-6 bg-card rounded-2xl border border-border/50 shadow-sm">
           <div className="flex items-center justify-between mb-1">
-            <h1 className="text-2xl font-bold text-foreground">Catatan Keuangan</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Catatan Keuangan</h1>
+              {userName && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Halo, <span className="font-semibold text-primary">{userName}</span> 👋
+                </p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <BudgetSettingsDialog settings={budgetSettings} onUpdate={updateBudgetSettings} />
@@ -67,6 +89,15 @@ const Index = () => {
                 <BarChart3 className="w-5 h-5" />
               </Link>
               <ResetDataDialog onReset={resetData} />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-xl"
+                onClick={signOut}
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </Button>
             </div>
           </div>
           <p className="text-muted-foreground">Kelola uangmu dengan bijak</p>
